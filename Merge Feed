@@ -26,8 +26,8 @@ def load_and_filter_cdr_file(cdr_path):
     # Filter and make a copy to avoid SettingWithCopyWarning
     cdr_df = cdr_df[(cdr_df['CLIENT_STATUS'] == 'ACTIV') & (cdr_df['APPLICATION'] == 'GLOBALBOOK')].copy()
     
-    # Ensure CLIENT_ARRANGEMENT_SHORT_NAME is a string and strip whitespace
-    cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'] = cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'].astype(str).str.strip()
+    # Ensure CLIENT_ARRANGEMENT_SHORT_NAME is converted to integer if possible, then to string
+    cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'] = cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'].apply(lambda x: str(int(x)) if pd.notnull(x) and x == int(x) else str(x)).str.strip()
     print("Sample CLIENT_ARRANGEMENT_SHORT_NAME values:", cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'].head())  # Diagnostic
     
     return cdr_df
@@ -50,8 +50,8 @@ def merge_all_feed_files(toronto_path, sydney_path, london_path, chunksize=50000
             # Add Location column
             chunk['Location'] = tag
             
-            # Ensure GBL_BKID is a string and strip whitespace
-            chunk['GBL_BKID'] = chunk['GBL_BKID'].astype(str).str.strip()
+            # Convert GBL_BKID to integer if possible, then to string
+            chunk['GBL_BKID'] = chunk['GBL_BKID'].apply(lambda x: str(int(x)) if pd.notnull(x) and x == int(x) else str(x)).str.strip()
             print("Sample GBL_BKID values:", chunk['GBL_BKID'].head())  # Diagnostic
             
             chunk_list.append(chunk)
