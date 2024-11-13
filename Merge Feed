@@ -2,20 +2,20 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-# Function to process each feed file in chunks and concatenate all feeds into one DataFrame
+# Function to process each feed file and concatenate all feeds into one DataFrame
 def merge_all_feed_files(toronto_path, sydney_path, london_path, chunksize=50000):
     chunk_list = []  # To hold processed chunks for each feed file
 
-    # List of feed files with corresponding location tags and header removal flag
+    # List of feed files with corresponding location tags
     feed_files = [
-        (toronto_path, 'TORONTO', False),
-        (sydney_path, 'SYDNEY', True),
-        (london_path, 'LONDON', True)
+        (toronto_path, 'TORONTO'),
+        (sydney_path, 'SYDNEY'),
+        (london_path, 'LONDON')
     ]
     
     # Process each feed file
-    for file_path, tag, remove_header in feed_files:
-        for chunk in pd.read_csv(file_path, encoding='ISO-8859-1', skiprows=1 if remove_header else 0, chunksize=chunksize):
+    for file_path, tag in feed_files:
+        for chunk in pd.read_csv(file_path, encoding='ISO-8859-1', chunksize=chunksize):
             # Standardize column names and ensure 'GBL_BKID' exists
             chunk.columns = chunk.columns.str.strip().str.upper()
             if 'GBL_BKID' not in chunk.columns:
