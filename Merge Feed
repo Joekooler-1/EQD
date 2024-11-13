@@ -2,48 +2,81 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-# Function to load and tag feed files with their location
-def load_and_tag(file_path, tag, remove_header=False):
-    try:
-        if remove_header:
-            df = pd.read_csv(file_path, skiprows=1, encoding='ISO-8859-1')  # Skip first row if header is to be removed
-        else:
-            df = pd.read_csv(file_path, encoding='ISO-8859-1')
-    except UnicodeDecodeError:
-        df = pd.read_csv(file_path, encoding='cp1252')  # Fallback encoding if ISO-8859-1 fails
-    df['Location'] = tag
-    return df
+# Function to process each feed file in chunks
+def process_feed_file_in_chunks(file_path, tag, remove_header=False, chunksize=50000):
+    chunk_list = []  # To hold processed chunks
 
-# Function to merge feed files (Toronto, Sydney, London)
-def merge_files(toronto_path, sydney_path, london_path):
-    toronto_df = load_and_tag(toronto_path, 'TORONTO', remove_header=False)  # Keep header for Toronto
-    sydney_df = load_and_tag(sydney_path, 'SYDNEY', remove_header=True)       # Remove header for Sydney
-    london_df = load_and_tag(london_path, 'LONDON', remove_header=True)       # Remove header for London
-    merged_df = pd.concat([toronto_df, sydney_df, london_df], ignore_index=True)
-    return merged_df
-
-# Function to merge feed data with CDR file based on specific columns
-def merge_feed_with_cdr(feed_df, cdr_path):
-    try:
-        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='ISO-8859-1')  # Read the .psv CDR file with pipe separator
-    except UnicodeDecodeError:
-        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='cp1252')  # Fallback encoding if initial fails
+    # Read the feed file in chunks
+    for chunk in pd.read_csv(file_path, encoding='ISO-8859-1', skiprows=1 if remove_header else 0, chunksize=chunksize):
+        # Add Location column
+        chunk['Location'] = tag
+        chunk_list.append(chunk)
     
-    # Convert both key columns to string type to ensure compatibility
-    feed_df['GBL_BKID'] = feed_df['GBL_BKID'].astype(str)
+    # Concatenate all chunks to form the final DataFrame for this feed file
+    return pd.concat(chunk_list, ignore_index=True)
+
+# Function to process and merge all feed files
+def merge_feed_files_in_chunks(toronto_path, sydney_path, london_path):
+    # Process each feed file with its respective tag
+    toronto_df = process_feed_file_in_chunks(toronto_path, 'TORONTO', remove_header=False)
+    sydney_df = process_feed_file_in_chunks(sydney_path, 'SYDNEY', remove_header=True)
+    london_df = process_feed_file_in_chunks(london_path, 'LONDON', remove_header=True)
+    
+    # Concatenate all feed data into one DataFrame
+    return pd.concat([toronto_df, sydney_df, london_df], ignore_index=True)
+
+# Function to load the CDR file
+def load_cdr_file(cdr_path):
+    try:
+        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='ISO-8859-1')
+    except UnicodeDecodeError:
+        # Fallback encoding if initial encoding fails
+        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='cp1252')
+    
+    # Convert key column to string
     cdr_df['Client_Arrangement_Short_Name'] = cdr_df['Client_Arrangement_Short_Name'].astype(str)
-    
-    # Merge on the converted key columns
-    merged_df = pd.merge(feed_df, cdr_df, how='left', left_on='GBL_BKID', right_on='Client_Arrangement_Short_Name')
-    merged_df = merged_df.drop(columns=['Client_Arrangement_Short_Name'])
-    return merged_df
+    return cdr_df
 
-# Function to run the full merge process
-def run_merge(toronto_path, sydney_path, london_path, cdr_path, output_path):
+# Function to merge the feed data with the CDR data in chunks
+def merge_feed_with_cdr_in_chunks(feed_path_list, cdr_path, output_path, chunksize=50000):
+    # Load the CDR data
+    cdr_df = load_cdr_file(cdr_path)
+    
+    # Process each feed file and merge with CDR in chunks
+    merged_chunks = []  # To hold merged chunks
+    for file_path, tag, remove_header in feed_path_list:
+        # Read each feed file in chunks
+        for chunk in pd.read_csv(file_path, encoding='ISO-8859-1', skiprows=1 if remove_header else 0, chunksize=chunksize):
+            # Add Location column
+            chunk['Location'] = tag
+            
+            # Convert key column to string
+            chunk['GBL_BKID'] = chunk['GBL_BKID'].astype(str)
+            
+            # Merge chunk with CDR data
+            merged_chunk = pd.merge(chunk, cdr_df, how='left', left_on='GBL_BKID', right_on='Client_Arrangement_Short_Name')
+            merged_chunk = merged_chunk.drop(columns=['Client_Arrangement_Short_Name'])
+            merged_chunks.append(merged_chunk)
+    
+    # Concatenate all merged chunks
+    final_df = pd.concat(merged_chunks, ignore_index=True)
+    return final_df
+
+# Function to run the full merge process and save the result
+def run_merge_and_save(toronto_path, sydney_path, london_path, cdr_path, output_path):
     try:
-        feed_data = merge_files(toronto_path, sydney_path, london_path)
-        final_data = merge_feed_with_cdr(feed_data, cdr_path)
-        final_data.to_excel(output_path, index=False)
+        # List of feed file paths with metadata for processing
+        feed_path_list = [
+            (toronto_path, 'TORONTO', False),
+            (sydney_path, 'SYDNEY', True),
+            (london_path, 'LONDON', True)
+        ]
+        
+        # Perform the merge in chunks
+        final_data = merge_feed_with_cdr_in_chunks(feed_path_list, cdr_path, output_path)
+        
+        # Save the final merged DataFrame to an output file
+        final_data.to_csv(output_path, index=False, encoding='ISO-8859-1')
         messagebox.showinfo("Success", f"Files have been merged and saved to {output_path}")
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred: {e}")
@@ -55,7 +88,7 @@ def select_file(entry_widget):
     entry_widget.insert(0, file_path)
 
 def save_file(entry_widget):
-    file_path = filedialog.asksaveasfilename(defaultextension=".xls")  # No file type restriction
+    file_path = filedialog.asksaveasfilename(defaultextension=".csv")  # Save as CSV for lower memory usage
     entry_widget.delete(0, tk.END)
     entry_widget.insert(0, file_path)
 
@@ -90,7 +123,7 @@ def main():
     tk.Button(root, text="Browse", command=lambda: save_file(output_entry)).grid(row=4, column=2, padx=10, pady=5)
 
     # Run the merge when the button is clicked
-    tk.Button(root, text="Merge Files", command=lambda: run_merge(
+    tk.Button(root, text="Merge Files", command=lambda: run_merge_and_save(
         toronto_entry.get(),
         sydney_entry.get(),
         london_entry.get(),
