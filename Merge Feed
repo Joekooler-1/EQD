@@ -4,11 +4,15 @@ from tkinter import filedialog, messagebox
 
 # Function to load and tag feed files with their location
 def load_and_tag(file_path, tag, remove_header=False):
-    # Read CSV file with or without header depending on the `remove_header` flag
-    if remove_header:
-        df = pd.read_csv(file_path, skiprows=1)  # Skip the first row if header is to be removed
-    else:
-        df = pd.read_csv(file_path)
+    # Attempt to load CSV with specified encoding
+    try:
+        if remove_header:
+            df = pd.read_csv(file_path, skiprows=1, encoding='ISO-8859-1')  # Skip first row if header is to be removed
+        else:
+            df = pd.read_csv(file_path, encoding='ISO-8859-1')
+    except UnicodeDecodeError:
+        # Fallback encoding
+        df = pd.read_csv(file_path, encoding='cp1252')  # Try Windows encoding if ISO-8859-1 fails
     df['Location'] = tag
     return df
 
@@ -22,9 +26,14 @@ def merge_files(toronto_path, sydney_path, london_path):
 
 # Function to merge feed data with CDR file based on specific columns
 def merge_feed_with_cdr(feed_df, cdr_path):
-    cdr_df = pd.read_csv(cdr_path, sep='|')  # Read the .psv CDR file with pipe separator
-    feed_key_column = 'B'  # Adjust if necessary
-    cdr_key_column = 'J'   # Adjust if necessary
+    try:
+        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='ISO-8859-1')  # Read the .psv CDR file with pipe separator
+    except UnicodeDecodeError:
+        # Fallback encoding if initial encoding fails
+        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='cp1252')
+    
+    feed_key_column = 'GBL_BKID'  # New key column in the feed file
+    cdr_key_column = 'Client_Arrangement_Short_Name'  # New key column in the CDR file
     merged_df = pd.merge(feed_df, cdr_df, how='left', left_on=feed_key_column, right_on=cdr_key_column)
     merged_df = merged_df.drop(columns=[cdr_key_column])
     return merged_df
