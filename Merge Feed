@@ -4,15 +4,13 @@ from tkinter import filedialog, messagebox
 
 # Function to load and tag feed files with their location
 def load_and_tag(file_path, tag, remove_header=False):
-    # Attempt to load CSV with specified encoding
     try:
         if remove_header:
             df = pd.read_csv(file_path, skiprows=1, encoding='ISO-8859-1')  # Skip first row if header is to be removed
         else:
             df = pd.read_csv(file_path, encoding='ISO-8859-1')
     except UnicodeDecodeError:
-        # Fallback encoding
-        df = pd.read_csv(file_path, encoding='cp1252')  # Try Windows encoding if ISO-8859-1 fails
+        df = pd.read_csv(file_path, encoding='cp1252')  # Fallback encoding if ISO-8859-1 fails
     df['Location'] = tag
     return df
 
@@ -29,13 +27,15 @@ def merge_feed_with_cdr(feed_df, cdr_path):
     try:
         cdr_df = pd.read_csv(cdr_path, sep='|', encoding='ISO-8859-1')  # Read the .psv CDR file with pipe separator
     except UnicodeDecodeError:
-        # Fallback encoding if initial encoding fails
-        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='cp1252')
+        cdr_df = pd.read_csv(cdr_path, sep='|', encoding='cp1252')  # Fallback encoding if initial fails
     
-    feed_key_column = 'GBL_BKID'  # New key column in the feed file
-    cdr_key_column = 'Client_Arrangement_Short_Name'  # New key column in the CDR file
-    merged_df = pd.merge(feed_df, cdr_df, how='left', left_on=feed_key_column, right_on=cdr_key_column)
-    merged_df = merged_df.drop(columns=[cdr_key_column])
+    # Convert both key columns to string type to ensure compatibility
+    feed_df['GBL_BKID'] = feed_df['GBL_BKID'].astype(str)
+    cdr_df['Client_Arrangement_Short_Name'] = cdr_df['Client_Arrangement_Short_Name'].astype(str)
+    
+    # Merge on the converted key columns
+    merged_df = pd.merge(feed_df, cdr_df, how='left', left_on='GBL_BKID', right_on='Client_Arrangement_Short_Name')
+    merged_df = merged_df.drop(columns=['Client_Arrangement_Short_Name'])
     return merged_df
 
 # Function to run the full merge process
