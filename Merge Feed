@@ -27,14 +27,14 @@ def load_and_filter_cdr_file(cdr_path):
     if missing_columns:
         raise ValueError(f"Missing required columns in CDR file: {missing_columns}. Available columns: {cdr_df.columns.tolist()}")
     
-    # Apply filters to keep only rows with Client_Status == 'ACTIV' and Application == 'GLOBALBOOK'
-    cdr_df = cdr_df[(cdr_df['CLIENT_STATUS'] == 'ACTIV') & (cdr_df['APPLICATION'] == 'GLOBALBOOK')]
+    # Apply filters and make a copy to avoid SettingWithCopyWarning
+    cdr_df = cdr_df[(cdr_df['CLIENT_STATUS'] == 'ACTIV') & (cdr_df['APPLICATION'] == 'GLOBALBOOK')].copy()
     
     # Convert key column to string for merging compatibility
     cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'] = cdr_df['CLIENT_ARRANGEMENT_SHORT_NAME'].astype(str)
     return cdr_df
 
-# Function to merge feed files into one DataFrame
+# Function to process each feed file and concatenate all feeds into one DataFrame
 def merge_all_feed_files(toronto_path, sydney_path, london_path, chunksize=50000):
     chunk_list = []  # To hold processed chunks for each feed file
 
