@@ -3,9 +3,9 @@ import pandas as pd
 def load_and_tag(file_path, tag, remove_header=False):
     # Load data with or without header depending on the `remove_header` flag
     if remove_header:
-        df = pd.read_csv(file_path, skiprows=1)  # Skip the first row if header is to be removed
+        df = pd.read_excel(file_path, skiprows=1)  # Skip the first row if header is to be removed
     else:
-        df = pd.read_csv(file_path)
+        df = pd.read_excel(file_path)
     
     # Add a new column for the location tag
     df['Location'] = tag
@@ -23,13 +23,13 @@ def merge_files(toronto_path, sydney_path, london_path):
     return merged_df
 
 # Example file paths (replace with actual paths)
-toronto_path = 'path/to/toronto.csv'
-sydney_path = 'path/to/sydney.csv'
-london_path = 'path/to/london.csv'
+toronto_path = 'path/to/toronto.xls'
+sydney_path = 'path/to/sydney.xls'
+london_path = 'path/to/london.xls'
 
 # Merge files
 merged_data = merge_files(toronto_path, sydney_path, london_path)
 
-# Save to a new CSV file or display the result
-merged_data.to_csv('merged_output.csv', index=False)  # Save merged data
+# Save to a new Excel file or display the result
+merged_data.to_excel('merged_output.xls', index=False)  # Save merged data
 # print(merged_data)  # Uncomment to print merged data
