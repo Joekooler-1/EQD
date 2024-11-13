@@ -5,9 +5,9 @@ from tkinter import filedialog, messagebox
 # Function to load and tag feed files with their location
 def load_and_tag(file_path, tag, remove_header=False):
     if remove_header:
-        df = pd.read_excel(file_path, skiprows=1)  # Skip the first row if header is to be removed
+        df = pd.read_excel(file_path, skiprows=1, engine='xlrd')  # Skip the first row if header is to be removed
     else:
-        df = pd.read_excel(file_path)
+        df = pd.read_excel(file_path, engine='xlrd')
     df['Location'] = tag
     return df
 
@@ -21,7 +21,7 @@ def merge_files(toronto_path, sydney_path, london_path):
 
 # Function to merge feed data with CDR file based on specific columns
 def merge_feed_with_cdr(feed_df, cdr_path):
-    cdr_df = pd.read_excel(cdr_path)
+    cdr_df = pd.read_csv(cdr_path, sep='|')  # Read the .psv CDR file with pipe separator
     feed_key_column = 'B'  # Adjust if necessary
     cdr_key_column = 'J'   # Adjust if necessary
     merged_df = pd.merge(feed_df, cdr_df, how='left', left_on=feed_key_column, right_on=cdr_key_column)
