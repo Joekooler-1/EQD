@@ -1,35 +1,95 @@
 import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
+# Function to load and tag feed files with their location
 def load_and_tag(file_path, tag, remove_header=False):
-    # Load data with or without header depending on the `remove_header` flag
     if remove_header:
         df = pd.read_excel(file_path, skiprows=1)  # Skip the first row if header is to be removed
     else:
         df = pd.read_excel(file_path)
-    
-    # Add a new column for the location tag
     df['Location'] = tag
     return df
 
+# Function to merge feed files (Toronto, Sydney, London)
 def merge_files(toronto_path, sydney_path, london_path):
-    # Load each file and tag with location; removing header for specific files if needed
-    toronto_df = load_and_tag(toronto_path, 'TORONTO', remove_header=False)  # Header kept for Toronto
+    toronto_df = load_and_tag(toronto_path, 'TORONTO', remove_header=False)  # Keep header for Toronto
     sydney_df = load_and_tag(sydney_path, 'SYDNEY', remove_header=True)       # Remove header for Sydney
     london_df = load_and_tag(london_path, 'LONDON', remove_header=True)       # Remove header for London
-    
-    # Concatenate all dataframes
     merged_df = pd.concat([toronto_df, sydney_df, london_df], ignore_index=True)
-    
     return merged_df
 
-# Example file paths (replace with actual paths)
-toronto_path = 'path/to/toronto.xls'
-sydney_path = 'path/to/sydney.xls'
-london_path = 'path/to/london.xls'
+# Function to merge feed data with CDR file based on specific columns
+def merge_feed_with_cdr(feed_df, cdr_path):
+    cdr_df = pd.read_excel(cdr_path)
+    feed_key_column = 'B'  # Adjust if necessary
+    cdr_key_column = 'J'   # Adjust if necessary
+    merged_df = pd.merge(feed_df, cdr_df, how='left', left_on=feed_key_column, right_on=cdr_key_column)
+    merged_df = merged_df.drop(columns=[cdr_key_column])
+    return merged_df
 
-# Merge files
-merged_data = merge_files(toronto_path, sydney_path, london_path)
+# Function to run the full merge process
+def run_merge(toronto_path, sydney_path, london_path, cdr_path, output_path):
+    try:
+        feed_data = merge_files(toronto_path, sydney_path, london_path)
+        final_data = merge_feed_with_cdr(feed_data, cdr_path)
+        final_data.to_excel(output_path, index=False)
+        messagebox.showinfo("Success", f"Files have been merged and saved to {output_path}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
 
-# Save to a new Excel file or display the result
-merged_data.to_excel('merged_output.xls', index=False)  # Save merged data
-# print(merged_data)  # Uncomment to print merged data
+# Setting up the Tkinter GUI
+def select_file(entry_widget):
+    file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
+    entry_widget.delete(0, tk.END)
+    entry_widget.insert(0, file_path)
+
+def save_file(entry_widget):
+    file_path = filedialog.asksaveasfilename(defaultextension=".xls", filetypes=[("Excel files", "*.xls")])
+    entry_widget.delete(0, tk.END)
+    entry_widget.insert(0, file_path)
+
+# Main function to initialize the Tkinter app
+def main():
+    root = tk.Tk()
+    root.title("Feed and CDR Merger")
+
+    tk.Label(root, text="Select Toronto Feed File:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    toronto_entry = tk.Entry(root, width=50)
+    toronto_entry.grid(row=0, column=1, padx=10, pady=5)
+    tk.Button(root, text="Browse", command=lambda: select_file(toronto_entry)).grid(row=0, column=2, padx=10, pady=5)
+
+    tk.Label(root, text="Select Sydney Feed File:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    sydney_entry = tk.Entry(root, width=50)
+    sydney_entry.grid(row=1, column=1, padx=10, pady=5)
+    tk.Button(root, text="Browse", command=lambda: select_file(sydney_entry)).grid(row=1, column=2, padx=10, pady=5)
+
+    tk.Label(root, text="Select London Feed File:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+    london_entry = tk.Entry(root, width=50)
+    london_entry.grid(row=2, column=1, padx=10, pady=5)
+    tk.Button(root, text="Browse", command=lambda: select_file(london_entry)).grid(row=2, column=2, padx=10, pady=5)
+
+    tk.Label(root, text="Select CDR File:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+    cdr_entry = tk.Entry(root, width=50)
+    cdr_entry.grid(row=3, column=1, padx=10, pady=5)
+    tk.Button(root, text="Browse", command=lambda: select_file(cdr_entry)).grid(row=3, column=2, padx=10, pady=5)
+
+    tk.Label(root, text="Save Merged Output As:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+    output_entry = tk.Entry(root, width=50)
+    output_entry.grid(row=4, column=1, padx=10, pady=5)
+    tk.Button(root, text="Browse", command=lambda: save_file(output_entry)).grid(row=4, column=2, padx=10, pady=5)
+
+    # Run the merge when the button is clicked
+    tk.Button(root, text="Merge Files", command=lambda: run_merge(
+        toronto_entry.get(),
+        sydney_entry.get(),
+        london_entry.get(),
+        cdr_entry.get(),
+        output_entry.get()
+    )).grid(row=5, column=0, columnspan=3, pady=20)
+
+    root.mainloop()
+
+# Run the application
+if __name__ == "__main__":
+    main()
