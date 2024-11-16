@@ -1,0 +1,134 @@
+"""
+Tkinter GUI Feed and CDR Merger Documentation
+
+This script processes feed files and merges them with a CDR file using specified matching criteria. 
+The merged data is then saved as a CSV file. The script employs a graphical user interface (GUI) built with `Tkinter` 
+for selecting files, viewing progress, and displaying error messages if necessary.
+
+---
+
+1. load_and_filter_cdr_file(cdr_path)
+    This function loads the CDR file, filters it based on specific criteria, and prepares it for merging.
+
+    Parameters:
+    - cdr_path (str): Path to the CDR file to be loaded.
+
+    Process:
+    1. Read the CDR File:
+       - Attempts to read the CDR file using different encodings (`ISO-8859-1`, `cp1252`, and `utf-8`) 
+         to handle potential character encoding issues. Each encoding is tried in sequence, with the final fallback to `utf-8`.
+       - If all encoding attempts fail, an error message is raised.
+    2. Display Column Information (Diagnostic):
+       - Prints the column names in the CDR file to verify that required columns are present and correctly named.
+    3. Standardize Column Names:
+       - Ensures that all column names are uppercase with any leading/trailing whitespace removed, for consistent naming across all files.
+    4. Verify Required Columns:
+       - Checks that the columns `CLIENT_STATUS`, `APPLICATION`, and `CLIENT_ARRANGEMENT_SHORT_NAME` are present in the DataFrame. 
+       - If any of these columns are missing, an error is raised, displaying the missing column(s) and available columns.
+    5. Apply Filters to Rows:
+       - Filters the DataFrame to keep only rows where `CLIENT_STATUS` is `'ACTIV'` and `APPLICATION` is `'GLOBALBOOK'`. 
+         The result is explicitly copied to avoid a `SettingWithCopyWarning`.
+    6. Format `CLIENT_ARRANGEMENT_SHORT_NAME`:
+       - Converts values in `CLIENT_ARRANGEMENT_SHORT_NAME` to integer format if possible, then to string. 
+         This removes any `.0` suffix from values, ensuring compatibility during merging.
+       - Any whitespace in values is stripped.
+    7. Return Filtered DataFrame:
+       - Returns the filtered and formatted CDR DataFrame ready for merging.
+
+---
+
+2. merge_all_feed_files(toronto_path, sydney_path, london_path, chunksize=50000)
+    This function processes each feed file, tags it with a location, and combines all feeds into a single DataFrame.
+
+    Parameters:
+    - toronto_path (str): Path to the Toronto feed file.
+    - sydney_path (str): Path to the Sydney feed file.
+    - london_path (str): Path to the London feed file.
+    - chunksize (int, optional): Number of rows to read in each chunk for efficient processing.
+
+    Process:
+    1. Define Feed Files with Tags:
+       - A list of tuples pairs each feed file path with a location tag (`'TORONTO'`, `'SYDNEY'`, `'LONDON'`). 
+         Each feed file will be tagged with the appropriate location for later identification.
+    2. Process Each Feed File:
+       - Iterates over each feed file and processes it in chunks.
+    3. Standardize Columns and Check for `GBL_BKID`:
+       - Strips whitespace and converts all column names to uppercase to maintain consistency.
+       - Checks for the existence of the `GBL_BKID` column. If `GBL_BKID` is missing, raises an error displaying available columns for diagnostics.
+    4. Tag Feed File and Format `GBL_BKID`:
+       - Adds a `Location` column to each chunk, indicating the source of the feed file.
+       - Converts `GBL_BKID` values to integer format if applicable, then to string, removing any `.0` suffix. This ensures compatibility during merging.
+       - Removes any whitespace in `GBL_BKID` values.
+    5. Append Processed Chunks:
+       - Appends each processed chunk to `chunk_list`.
+    6. Concatenate All Feed Chunks:
+       - Concatenates all processed feed chunks into a single DataFrame and returns it.
+
+---
+
+3. merge_combined_feed_with_cdr(feed_df, cdr_df, chunksize=50000)
+    This function merges the combined feed data with the filtered CDR data in manageable chunks.
+
+    Parameters:
+    - feed_df (DataFrame): Combined feed data from all sources.
+    - cdr_df (DataFrame): Filtered and formatted CDR data.
+    - chunksize (int, optional): Number of rows per chunk to process during merging.
+
+    Process:
+    1. Iterate Over Feed Chunks:
+       - Splits the `feed_df` into chunks of size `chunksize` to optimize memory usage and avoid loading the entire feed data at once.
+    2. Merge Each Chunk with CDR Data:
+       - Merges each chunk with the `cdr_df` on the `GBL_BKID` column in the feed data and `CLIENT_ARRANGEMENT_SHORT_NAME` in the CDR data.
+       - A left join ensures that all records from the feed data are preserved, even if there’s no matching record in the CDR data.
+    3. Drop Redundant Column:
+       - After merging, removes `CLIENT_ARRANGEMENT_SHORT_NAME` from the result to avoid redundancy.
+    4. Store Merged Chunks:
+       - Appends each merged chunk to `merged_chunks`.
+    5. Concatenate and Return Merged Data:
+       - Concatenates all merged chunks into a single DataFrame and returns it.
+
+---
+
+4. run_merge_and_save(toronto_path, sydney_path, london_path, cdr_path, output_path)
+    This function orchestrates the entire merging process, from loading files to saving the final output.
+
+    Parameters:
+    - toronto_path (str): Path to the Toronto feed file.
+    - sydney_path (str): Path to the Sydney feed file.
+    - london_path (str): Path to the London feed file.
+    - cdr_path (str): Path to the CDR file.
+    - output_path (str): Path to save the merged output file.
+
+    Process:
+    1. Merge All Feed Files:
+       - Calls `merge_all_feed_files` to combine the feed files into a single DataFrame.
+    2. Load and Filter CDR File:
+       - Calls `load_and_filter_cdr_file` to load, filter, and format the CDR data for merging.
+    3. Merge Feed Data with Filtered CDR Data:
+       - Calls `merge_combined_feed_with_cdr` to perform the chunked merging of the combined feed data with the filtered CDR data.
+    4. Save Final Merged Data:
+       - Saves the final merged DataFrame to `output_path` as a CSV file using `ISO-8859-1` encoding.
+       - If the operation is successful, displays a success message.
+       - If an error occurs during any step, displays an error message.
+
+---
+
+5. Tkinter GUI
+    The Tkinter GUI provides a user-friendly interface for selecting files and saving the output.
+
+    Components:
+    - File Selection: Allows users to select the Toronto, Sydney, London feed files, and the CDR file using file dialogs.
+    - Output File Selection: Allows users to specify the location and name of the output file.
+    - Merge Button: Starts the merge process when clicked, triggering `run_merge_and_save`.
+
+    User Workflow:
+    1. Select Feed Files:
+       - Browse and select the Toronto, Sydney, and London feed files.
+    2. Select CDR File:
+       - Browse and select the CDR file.
+    3. Specify Output File:
+       - Choose a name and location for the final output file.
+    4. Click Merge:
+       - Starts the merging process, with progress displayed in message boxes.
+
+"""
